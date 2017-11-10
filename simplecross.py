@@ -4,22 +4,30 @@ from __future__ import (absolute_import, division, print_function,
 import datetime  # For datetime objects
 import os.path  # To manage paths
 import sys  # To find out the script name (in argv[0])
+import argparse
 
 # Import the backtrader platform
 import backtrader as bt
+import backtrader.feeds as btfeeds
+import backtrader.indicators as btind
 
+import pandas
 
-# Create a Stratey
-class TestStrategy(bt.Strategy):
+###########################################
+# Crossover Stratey based on SMA crossovers
+###########################################
+
+class SMAStrategy(bt.Strategy):
     params = (
-        ('fastperiod', 8),
-		('slowperiod', 89)
+        ('fastperiod', 8*60),
+		('slowperiod', 89*60)
     )
 
     def log(self, txt, dt=None):
         ''' Logging function fot this strategy'''
-        dt = dt or self.datas[0].datetime.date(0)
-        print('%s, %s' % (dt.isoformat(), txt))
+        dt = dt or self.datas[0].datetime.datetime(0)
+        print('%s : %s' % (dt.isoformat(), txt))
+
 
     def __init__(self):
         # Keep a reference to the "close" line in the data[0] dataseries
@@ -31,16 +39,18 @@ class TestStrategy(bt.Strategy):
         self.sellprice = None
         
         # Add a MovingAverageSimple indicator
-        self.fastsma = bt.indicators.SimpleMovingAverage(self.datas[0], period=self.params.fastperiod)
-        self.slowsma = bt.indicators.SimpleMovingAverage(self.datas[0], period=self.params.slowperiod)
+        self.fastsma = btind.SimpleMovingAverage(self.datas[0], period=self.params.fastperiod)
+        self.slowsma = btind.SimpleMovingAverage(self.datas[0], period=self.params.slowperiod)
         
-        self.cross = bt.ind.CrossOver(self.fastsma,self.slowsma)
+        self.cross = btind.CrossOver(self.fastsma,self.slowsma)
         
         self.orefs = list()
+
+        self.log( 'init ok')
         
 		
     def notify_order(self, order):
-        print('{}: Order ref: {} / Type {} / Status {}'.format(
+        self.log('{}: Order ref: {} / Type {} / Status {}'.format(
             self.data.datetime.date(0),
             order.ref, 'Buy' * order.isbuy() or 'Sell',
             order.getstatusname()))
@@ -71,62 +81,82 @@ class TestStrategy(bt.Strategy):
         if not self.position:
 
             # positive crossover
+
+        #print( self.datadate[0])
+        #print('date %s open %.5f, close %.5f' % (str(self.data.datetime.datetime()),self.datas[0].open[0],self.datas[0].close[0]))
+        #print( 'sma fast %.2f' % self.fastsma[0])
             if self.cross > 0.0:
-                    
-                self.log('Crossover positive')
-                
+                  
+                print('Crossover positive')
+
                 # BUY
-                self.log('BUY CREATE, %.2f' % self.dataclose[0])
+                self.log('BUY CREATE, %.5f' % self.dataclose[0])
 
                 close = self.dataclose[0]
-                tp = 1.1 * close
-                sl = 0.95 * close
+                tp = 1.01 * close
+                sl = 0.995 * close
                 os = self.order = self.buy_bracket( price=close,exectype=bt.Order.Market,stopprice=sl,limitprice=tp)
                 # Keep track of the created orders
                 self.orefs = [o.ref for o in os]
                 
-            # negative crossover
+           # negative crossover
             
             if self.cross < 0.0:
                 
-                self.log('Crossover negative')
+                print('Crossover negative')
 
                 # SELL
-                self.log('SELL CREATE, %.2f' % self.dataclose[0])
+                self.log('SELL CREATE, %.5f' % self.dataclose[0])
 
                 close = self.dataclose[0]
-                tp = 0.9 * close
-                sl = 1.05 * close
+                tp = 0.99 * close
+                sl = 1.005 * close
                 os = self.order = self.sell_bracket( price=close,exectype=bt.Order.Market,stopprice=sl,limitprice=tp)
                 # Keep track of the created orders
                 self.orefs = [o.ref for o in os]
-              
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Pandas test script')
+
+    parser.add_argument('--config', action='store_true',default='simplecross.ini',required=False,help='Name of the config file (Default: simplecross.ini)')
+
+    return parser.parse_args()
+
 
 ############################
 # MAIN
 ############################                
-                
-if __name__ == '__main__':
+
+def main():         
+
+    args = parse_args()
+
+    # for smaller datasets, especially when tesitng
+    startdate = datetime.datetime(2006, 1, 1)
+    enddate = datetime.datetime(2006, 1, 31)
+
     # Create a cerebro entity
     cerebro = bt.Cerebro()
 
     # Add a strategy
-    cerebro.addstrategy(TestStrategy)
+    cerebro.addstrategy(SMAStrategy)
 
-    # Datas are in a subfolder of the samples. Need to find where the script is
-    # because it could have been called from anywhere
-    modpath = os.path.dirname(os.path.abspath(sys.argv[0]))
-    datapath = os.path.join(modpath, 'backtrader-master/datas/orcl-1995-2014.txt')
-
-    # Create a Data Feed
-    data = bt.feeds.YahooFinanceCSVData(
+    # load the csv data (converted from hst)
+    datapath = ('../data/test/EURUSD_1min.csv')
+    data = bt.feeds.GenericCSVData(
         dataname=datapath,
-        # Do not pass values before this date
-        fromdate=datetime.datetime(1996, 1, 1),
-        # Do not pass values before this date
-        todate=datetime.datetime(2013, 12, 31),
-        # Do not pass values after this date
-        reverse=False)
+        fromdate=startdate,
+        todate=enddate,
+        datetime=0,
+        open=1,
+        high=2,
+        low=3,
+        close=4,
+        volume=5,
+        openinterest=-1,
+        timeframe=bt.TimeFrame.Minutes
+        )
 
     # Add the Data Feed to Cerebro
     cerebro.adddata(data)
@@ -135,10 +165,10 @@ if __name__ == '__main__':
     cerebro.broker.setcash(10000.0)
 
     # Add a FixedSize sizer according to the stake
-    cerebro.addsizer(bt.sizers.FixedSize, stake=10)
+    #cerebro.addsizer(bt.sizers.FixedSize, stake=500)
 
     # Set the commission
-    cerebro.broker.setcommission(commission=0.0)
+ #   cerebro.broker.setcommission(commission=0.0)
 
     # Print out the starting conditions
     print('Starting Portfolio Value: %.2f' % cerebro.broker.getvalue())
@@ -150,4 +180,7 @@ if __name__ == '__main__':
     print('Final Portfolio Value: %.2f' % cerebro.broker.getvalue())
 
     # Plot the result
-    #cerebro.plot()
+    cerebro.plot(volume=False)
+
+if __name__ == '__main__':
+    main()
