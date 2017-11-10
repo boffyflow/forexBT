@@ -45,8 +45,6 @@ class SMAStrategy(bt.Strategy):
         self.cross = btind.CrossOver(self.fastsma,self.slowsma)
         
         self.orefs = list()
-
-        self.log( 'init ok')
         
 		
     def notify_order(self, order):
