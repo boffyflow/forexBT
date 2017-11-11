@@ -1,7 +1,7 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import datetime  # For datetime objects
+from datetime import datetime  # For datetime objects
 import os.path  # To manage paths
 import sys  # To find out the script name (in argv[0])
 import argparse
@@ -19,10 +19,10 @@ import pandas
 
 class SMAStrategy(bt.Strategy):
     params = (
-        ('fastperiod', 30*60),
+        ('fastperiod', 8*60),
 		('slowperiod', 89*60),
-        ('tp_delta', 0.015),
-        ('sl_delta', 0.01)
+        ('tp_delta', 0.005),
+        ('sl_delta', 0.003)
     )
 
     def log(self, txt, dt=None):
@@ -173,9 +173,9 @@ def main():
     args = parse_args()
 
     # for smaller datasets, especially when tesitng
-    startdate = datetime.datetime(2006, 1, 1)
-    enddate = datetime.datetime(2006, 1, 31)
-
+    startdate = datetime.strptime(args.startdate,'%Y-%m-%d')
+    enddate = datetime.strptime(args.enddate,'%Y-%m-%d')
+    
     # Create a cerebro entity
     cerebro = bt.Cerebro()
 
@@ -205,7 +205,7 @@ def main():
     cerebro.broker.setcash(10000.0)
 
     # Add a FixedSize sizer according to the stake
-    cerebro.addsizer(bt.sizers.FixedSize, stake=5000)
+    cerebro.addsizer(bt.sizers.FixedSize, stake=10000)
 
     # Set the commission
  #   cerebro.broker.setcommission(commission=0.0)
