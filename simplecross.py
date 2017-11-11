@@ -117,9 +117,13 @@ class SMAStrategy(bt.Strategy):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Pandas test script')
 
-    parser.add_argument('--config', action='store_true',default='simplecross.ini',required=False,help='Name of the config file (Default: simplecross.ini)')
+    parser = argparse.ArgumentParser(description='SimpleCross Back Tester')
+
+    parser.add_argument('--fast', action='store_true',default='8',required=False,help='Period of the faster moving average (default: 8)')
+    parser.add_argument('--slow', action='store_true',default='89',required=False,help='Period of the slower moving average (default: 89)')
+    parser.add_argument('--fast_type', action='store_true',default='SMA',choices=['SMA','EMA'],required=False,help='Type of faster moving average (SMA or EMA) (default: SMA)')
+    parser.add_argument('--slow_type', action='store_true',default='SMA',choices=['SMA','EMA'],required=False,help='Type of slower moving average (SMA or EMA) (default: SMA)')
 
     return parser.parse_args()
 
