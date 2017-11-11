@@ -20,7 +20,9 @@ import pandas
 class SMAStrategy(bt.Strategy):
     params = (
         ('fastperiod', 8*60),
-		('slowperiod', 89*60)
+		('slowperiod', 89*60),
+        ('tp_delta', 0.015),
+        ('sl_delta', 0.01)
     )
 
     def log(self, txt, dt=None):
@@ -45,8 +47,6 @@ class SMAStrategy(bt.Strategy):
         self.cross = btind.CrossOver(self.fastsma,self.slowsma)
         
         self.orefs = list()
-
-        self.log( 'init ok')
         
 		
     def notify_order(self, order):
@@ -82,6 +82,9 @@ class SMAStrategy(bt.Strategy):
 
             # positive crossover
 
+            tp_d = self.params.tp_delta
+            sl_d = self.params.sl_delta
+
         #print( self.datadate[0])
         #print('date %s open %.5f, close %.5f' % (str(self.data.datetime.datetime()),self.datas[0].open[0],self.datas[0].close[0]))
         #print( 'sma fast %.2f' % self.fastsma[0])
@@ -93,12 +96,18 @@ class SMAStrategy(bt.Strategy):
                 self.log('BUY CREATE, %.5f' % self.dataclose[0])
 
                 close = self.dataclose[0]
-                tp = 1.01 * close
-                sl = 0.995 * close
-                os = self.order = self.buy_bracket( price=close,exectype=bt.Order.Market,stopprice=sl,limitprice=tp)
+                #tp = close + close * tp_d
+                #sl = close - close * sl_d
+#                os = self.order = self.buy_bracket( price=close,exectype=bt.Order.Market,stopprice=sl,limitprice=tp)               
                 # Keep track of the created orders
-                self.orefs = [o.ref for o in os]
-                
+                #self.orefs = [o.ref for o in os]
+
+                # try trailing stop
+                os = self.order = self.sell()
+                self.orefs.append( os.ref)
+                os = self.order = self.buy( exectype=bt.Order.StopTrail, trailpercent=sl_d)
+                self.orefs.append( os.ref)
+
            # negative crossover
             
             if self.cross < 0.0:
@@ -109,11 +118,17 @@ class SMAStrategy(bt.Strategy):
                 self.log('SELL CREATE, %.5f' % self.dataclose[0])
 
                 close = self.dataclose[0]
-                tp = 0.99 * close
-                sl = 1.005 * close
-                os = self.order = self.sell_bracket( price=close,exectype=bt.Order.Market,stopprice=sl,limitprice=tp)
+                #tp = close - close * tp_d
+                #sl = close + close * sl_d
+                #os = self.order = self.sell_bracket( price=close,exectype=bt.Order.Market,stopprice=sl,limitprice=tp)
                 # Keep track of the created orders
-                self.orefs = [o.ref for o in os]
+                #self.orefs = [o.ref for o in os]
+
+                # try trailing stop
+                os = self.order = self.sell()
+                self.orefs.append( os.ref)
+                os = self.order = self.buy( exectype=bt.Order.StopTrail, trailpercent=sl_d)
+                self.orefs.append( os.ref)
 
 
 def parse_args():
@@ -169,7 +184,7 @@ def main():
     cerebro.broker.setcash(10000.0)
 
     # Add a FixedSize sizer according to the stake
-    #cerebro.addsizer(bt.sizers.FixedSize, stake=500)
+    cerebro.addsizer(bt.sizers.FixedSize, stake=5000)
 
     # Set the commission
  #   cerebro.broker.setcommission(commission=0.0)
