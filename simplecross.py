@@ -10,8 +10,11 @@ import argparse
 import backtrader as bt
 import backtrader.feeds as btfeeds
 import backtrader.indicators as btind
+import backtrader.analyzers as btan
 
 import pandas
+
+versionstring = '1.0.0'
 
 ###########################################
 # Crossover Stratey based on SMA crossovers
@@ -170,6 +173,8 @@ def parse_args():
 
 def main():         
 
+    print( 'Starting version: %s' % versionstring)
+
     args = parse_args()
 
     # for smaller datasets, especially when tesitng
@@ -183,9 +188,9 @@ def main():
     cerebro.addstrategy(SMAStrategy)
 
     # load the csv data (converted from hst)
-    datapath = ('../data/test/EURUSD_1min.csv')
+
     data = bt.feeds.GenericCSVData(
-        dataname=datapath,
+        dataname=args.data,
         fromdate=startdate,
         todate=enddate,
         datetime=0,
@@ -205,16 +210,26 @@ def main():
     cerebro.broker.setcash(10000.0)
 
     # Add a FixedSize sizer according to the stake
-    cerebro.addsizer(bt.sizers.FixedSize, stake=10000)
+
+    cerebro.addsizer(bt.sizers.FixedSize, stake=5000)
 
     # Set the commission
  #   cerebro.broker.setcommission(commission=0.0)
+
+    cerebro.addanalyzer(btan.BasicTradeStats)
+    cerebro.addanalyzer(btan.BasicTradeStats, filter='short')
+    cerebro.addanalyzer(btan.BasicTradeStats, filter='long')
 
     # Print out the starting conditions
     print('Starting Portfolio Value: %.2f' % cerebro.broker.getcash())
 
     # Run over everything
-    cerebro.run()
+    stratList = cerebro.run()
+
+    ss = stratList[0]
+    s=ss
+    for each in ss.analyzers:
+        each.print()
 
     # Print out the final result
     print('Portfolio Value: %.2f' % cerebro.broker.getvalue())
