@@ -1,7 +1,7 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import datetime  # For datetime objects
+from datetime import datetime  # For datetime objects
 import os.path  # To manage paths
 import sys  # To find out the script name (in argv[0])
 import argparse
@@ -19,10 +19,10 @@ import pandas
 
 class SMAStrategy(bt.Strategy):
     params = (
-        ('fastperiod', 30*60),
+        ('fastperiod', 8*60),
 		('slowperiod', 89*60),
-        ('tp_delta', 0.015),
-        ('sl_delta', 0.01)
+        ('tp_delta', 0.005),
+        ('sl_delta', 0.003)
     )
 
     def log(self, txt, dt=None):
@@ -134,11 +134,32 @@ class SMAStrategy(bt.Strategy):
 def parse_args():
 
     parser = argparse.ArgumentParser(description='SimpleCross Back Tester')
+ 
+     # CrossOver signal parameters
+    cogroup = parser.add_argument_group('CrossOver','Parameters relevant to the moving averages')
+ 
+    cogroup.add_argument('-f','--fast',default='8',type=int,required=False,help='Period of the faster moving average (default: 8)')
+    cogroup.add_argument('-s','--slow',default='89',type=int,required=False,help='Period of the slower moving average (default: 89)')
+    avgs = ['SMA','EMA']
+    cogroup.add_argument('-ft','--fasttype',default='SMA',choices=avgs,help='Type of faster moving average (SMA or EMA) (default: SMA)')
+    cogroup.add_argument('-st','--slowtype',default='SMA',choices=avgs,help='Type of slower moving average (SMA or EMA) (default: SMA)')
 
-    parser.add_argument('--fast', action='store_true',default='8',required=False,help='Period of the faster moving average (default: 8)')
-    parser.add_argument('--slow', action='store_true',default='89',required=False,help='Period of the slower moving average (default: 89)')
-    parser.add_argument('--fast_type', action='store_true',default='SMA',choices=['SMA','EMA'],required=False,help='Type of faster moving average (SMA or EMA) (default: SMA)')
-    parser.add_argument('--slow_type', action='store_true',default='SMA',choices=['SMA','EMA'],required=False,help='Type of slower moving average (SMA or EMA) (default: SMA)')
+    # Order management
+    omgroup = parser.add_argument_group('Order Management','Parameters relevant orders and stake sizing')
+    omgroup.add_argument('-ot','--ordertype',default='bracket',choices=['bracket','trailing'],help='Order type (default: bracket)')
+    omgroup.add_argument('-tp','--takeprofitunit',default='percent',choices=['percent','amount'],help='Type of units for take profit limits (default: percent)')
+    omgroup.add_argument('-sl','--stoplossunit',default='percent',choices=['percent','amount'],help='Type of units for stop loss limits (default: percent)')
+    omgroup.add_argument('-tpv','--takeprofitvalue',default='1.0',type=float,help='Amount for take profit in percent or fixed currency (default: 1.0)')
+    omgroup.add_argument('-slv','--stoplossvalue',default='1.0',type=float,help='Amount for stop loss in percent or fixed currency (default: 1.0)')
+    omgroup.add_argument('-r','--riskpercentage',default='0.3',type=float,help='Risk percentage of total balance (default: 0.3)')
+    omgroup.add_argument('-c','--commission',default='2.0',type=float,help='Commisssion value in USD (default: 2.0)')
+
+    # Data management
+    omgroup = parser.add_argument_group('Data Management','Parameters relevant to data feed and time frames')
+    omgroup.add_argument('-d','--data',default='data/EURUSD_1min.csv',help='CSV file used as data feed (default: data/EURUSD_1min.csv)')
+    omgroup.add_argument('-tf','--timeframe',default='H1',choices=['M1','M5','M10','M15','H1','D1'],help='Timeframe for trading signals (default: H1)')
+    omgroup.add_argument('-sd','--startdate',default='1900-01-01',help='Start date for the data feed (default: first timestamp)')
+    omgroup.add_argument('-ed','--enddate',default='2100-01-01',help='End date for the data feed (default: last timestamp)')
 
     return parser.parse_args()
 
@@ -152,9 +173,9 @@ def main():
     args = parse_args()
 
     # for smaller datasets, especially when tesitng
-    startdate = datetime.datetime(2006, 1, 1)
-    enddate = datetime.datetime(2006, 1, 31)
-
+    startdate = datetime.strptime(args.startdate,'%Y-%m-%d')
+    enddate = datetime.strptime(args.enddate,'%Y-%m-%d')
+    
     # Create a cerebro entity
     cerebro = bt.Cerebro()
 
@@ -184,7 +205,7 @@ def main():
     cerebro.broker.setcash(10000.0)
 
     # Add a FixedSize sizer according to the stake
-    cerebro.addsizer(bt.sizers.FixedSize, stake=5000)
+    cerebro.addsizer(bt.sizers.FixedSize, stake=10000)
 
     # Set the commission
  #   cerebro.broker.setcommission(commission=0.0)
