@@ -1,28 +1,48 @@
 import sqlite3
 import argparse
- 
- 
-def builddb(db_file):
-    
-    table_name1 = 'my_table_1'  # name of the table to be created
-    table_name2 = 'my_table_2'  # name of the table to be created
-    new_field = 'my_1st_column' # name of the column
-    field_type = 'INTEGER'  # column data type
 
+
+def addcurrency(conn, currency):
+    """ add a list of currency strings to be added to database"""
+
+    cur = conn.cursor()
+
+    for c in currency:
+        print(c)
+        cur.execute('INSERT INTO currencies(name) VALUES (?)', (c, ))
+
+    conn.commit()
+
+
+def createtables(conn):
+    
     # Connecting to the database file
-    conn = sqlite3.connect(db_file)
     c = conn.cursor()
 
     # Creating a new SQLite table with 1 column
-    c.execute('CREATE TABLE {tn} ({nf} {ft})'.format(tn=table_name1, nf=new_field, ft=field_type))
+    c.execute('CREATE TABLE IF NOT EXISTS trades (id INTEGER PRIMARY KEY ASC,\
+                                                    date_open DATETIME,\
+                                                    date_close DATETIME,\
+                                                    price_open DOUBLE,\
+                                                    price_close DOUBLE,\
+                                                    symbol VARCHAR(10),\
+                                                    volume INT,\
+                                                    stop_orig DOUBLE,\
+                                                    tp_orig DOUBLE,\
+                                                    currency_id INT)')
 
-    # Creating a second table with 1 column and set it as PRIMARY KEY
-    # note that PRIMARY KEY column must consist of unique values!
-    c.execute('CREATE TABLE {tn} ({nf} {ft} PRIMARY KEY)'.format(tn=table_name2, nf=new_field, ft=field_type))
+    c.execute('CREATE TABLE IF NOT EXISTS currencies (id INTEGER PRIMARY KEY ASC,\
+                                                    name VARCHAR(10))')
 
-    # Committing changes and closing the connection to the database file
+    c.execute('CREATE TABLE IF NOT EXISTS accounts (id INTEGER PRIMARY KEY,\
+                                    date_open DATETIME,\
+                                    date_close DATETIME)')
+
+    c.execute('CREATE TABLE IF NOT EXISTS strategies (id INTEGER PRIMARY KEY,\
+                                    date_open DATETIME,\
+                                    date_close DATETIME)')
+    
     conn.commit()
-    conn.close()
 
 def parse_args():
     
@@ -36,7 +56,13 @@ def parse_args():
 def main():
     args = parse_args()
     
-    builddb( args.dbname)
+    conn = sqlite3.connect(args.dbname)
+
+    createtables(conn)
+    addcurrency(conn, ['USD','CAD','EUR','JPY','AUD','CHF','NZD','GBP'])
+
+    conn.close()
+
 
 if __name__ == '__main__':
     main()
