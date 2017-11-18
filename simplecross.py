@@ -188,6 +188,7 @@ def main():
     cerebro.addstrategy(SMAStrategy)
 
     # load the csv data (converted from hst)
+
     data = bt.feeds.GenericCSVData(
         dataname=args.data,
         fromdate=startdate,
@@ -209,6 +210,7 @@ def main():
     cerebro.broker.setcash(10000.0)
 
     # Add a FixedSize sizer according to the stake
+
     cerebro.addsizer(bt.sizers.FixedSize, stake=5000)
 
     # Set the commission
